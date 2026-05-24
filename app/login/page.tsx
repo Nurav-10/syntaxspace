@@ -183,16 +183,6 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
-
-      {/* Admin note */}
-      <div className="relative z-10 mt-5 px-4 text-center">
-        <p className="text-[10px] text-muted-foreground">
-          Admin access is granted by email.{" "}
-          <span className="font-mono text-foreground/60">
-            Set ADMIN_EMAILS in .env
-          </span>
-        </p>
-      </div>
     </div>
   );
 }
