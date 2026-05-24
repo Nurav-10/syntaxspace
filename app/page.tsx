@@ -117,17 +117,17 @@ export default function Home() {
             in-browser visual sandboxes.
           </p>
 
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center font-semibold gap-3">
             <Link
               href="/learn/dsa/syllabus-of-data-structure-and-algorithms"
-              className="w-full sm:w-auto h-10 rounded-md bg-foreground px-6 text-sm font-semibold text-background hover:bg-foreground/90 flex items-center justify-center gap-1.5 transition-all"
+              className="w-full sm:w-auto h-10 rounded-md bg-foreground px-6 text-sm  text-background hover:bg-foreground/90 flex items-center justify-center gap-1.5 transition-all"
             >
               <span>Explore Syllabus</span>
               <HugeiconsIcon icon={ArrowRight01Icon} className="h-4 w-4" />
             </Link>
             <Link
               href={!user ? "/login" : "/learn/dsa"}
-              className="w-full sm:w-auto h-10 rounded-md border border-border bg-card px-6 text-sm font-semibold text-foreground hover:bg-accent transition-all flex items-center justify-center"
+              className="w-full sm:w-auto h-10 rounded-md border border-border bg-card px-6 text-sm  text-foreground hover:bg-accent transition-all flex items-center justify-center"
             >
               {!user ? "Login" : "Get Started"}
             </Link>
@@ -333,7 +333,7 @@ export default function Home() {
               alt="website-logo"
               className="dark:invert w-5 h-5"
             />
-            <span>SyntaxSpace © 2026. Made with ❤️ for expert engineers.</span>
+            <span>SyntaxSpace © 2026</span>
           </div>
           <div className="flex items-center gap-4">
             {isAdmin && (

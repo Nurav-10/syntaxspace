@@ -16,6 +16,7 @@ import { Callout } from "@/components/mdx/Callout";
 import { DSAVisualizer } from "@/components/mdx/DSAVisualizer";
 import { SQLPlayground } from "@/components/mdx/SQLPlayground";
 import { CodeTabs } from "@/components/mdx/CodeTabs";
+import { Steps, Step } from "@/components/mdx/Step";
 import { useUploadThing } from "@/lib/uploadthing";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -107,7 +108,7 @@ function renderMdxClientSide(mdxText: string) {
     // Handle CodeTabs container: e.g. <CodeTabs>...</CodeTabs>
     if (line.trim().startsWith("<CodeTabs")) {
       flushList(String(i));
-      
+
       // Capture lines up until </CodeTabs>
       let j = i + 1;
       const tabsContentLines: string[] = [];
@@ -116,13 +117,13 @@ function renderMdxClientSide(mdxText: string) {
         j++;
       }
       i = j; // Advance outer loop past the block
-      
+
       // Parse the captured lines to extract individual code blocks
       const tabBlocks: React.ReactNode[] = [];
       let inTabCodeBlock = false;
       let tabCodeBlockLines: string[] = [];
       let tabLang = "ts";
-      
+
       for (let k = 0; k < tabsContentLines.length; k++) {
         const tLine = tabsContentLines[k];
         if (tLine.trim().startsWith("```")) {
@@ -135,7 +136,7 @@ function renderMdxClientSide(mdxText: string) {
                 className={`language-${tabLang} bg-black text-zinc-200 border border-zinc-900 rounded-lg p-4 font-mono text-[10px] leading-relaxed overflow-x-auto [&_code]:bg-transparent [&_code]:border-0 [&_code]:p-0 [&_code]:rounded-none`}
               >
                 <code className={`language-${tabLang}`}>{codeText}</code>
-              </pre>
+              </pre>,
             );
             tabCodeBlockLines = [];
             inTabCodeBlock = false;
@@ -149,12 +150,68 @@ function renderMdxClientSide(mdxText: string) {
           tabCodeBlockLines.push(tLine);
         }
       }
-      
-      elements.push(
-        <CodeTabs key={`codetabs-${i}`}>
-          {tabBlocks}
-        </CodeTabs>
-      );
+
+      elements.push(<CodeTabs key={`codetabs-${i}`}>{tabBlocks}</CodeTabs>);
+      continue;
+    }
+
+    // Handle Steps container: e.g. <Steps>...</Steps>
+    if (line.trim().startsWith("<Steps")) {
+      flushList(String(i));
+
+      // Capture lines up until </Steps>
+      let j = i + 1;
+      const stepsContentLines: string[] = [];
+      while (j < lines.length && !lines[j].trim().startsWith("</Steps>")) {
+        stepsContentLines.push(lines[j]);
+        j++;
+      }
+      i = j; // Advance outer loop past the block
+
+      // Parse individual <Step> children inside the <Steps> container
+      const stepBlocks: React.ReactNode[] = [];
+      let k = 0;
+      while (k < stepsContentLines.length) {
+        const sLine = stepsContentLines[k].trim();
+        if (sLine.startsWith("<Step")) {
+          const numberMatch = sLine.match(/number="([^"]+?)"/);
+          const titleMatch = sLine.match(/title="([^"]+?)"/);
+          const subtitleMatch = sLine.match(/subtitle="([^"]+?)"/);
+
+          const stepNumber = numberMatch ? numberMatch[1] : String(stepBlocks.length + 1);
+          const stepTitle = titleMatch ? titleMatch[1] : "Step";
+          const stepSubtitle = subtitleMatch ? subtitleMatch[1] : undefined;
+
+          // Capture content lines for this step until </Step>
+          let stepContent = "";
+          let nextK = k + 1;
+          while (
+            nextK < stepsContentLines.length &&
+            !stepsContentLines[nextK].trim().startsWith("</Step>")
+          ) {
+            stepContent += stepsContentLines[nextK] + "\n";
+            nextK++;
+          }
+          k = nextK; // skip parsed lines
+
+          // Recursively call renderMdxClientSide to support full nested markdown formatting within each Step!
+          const parsedStepChildren = renderMdxClientSide(stepContent.trim());
+
+          stepBlocks.push(
+            <Step
+              key={`step-${k}`}
+              number={stepNumber}
+              title={stepTitle}
+              subtitle={stepSubtitle}
+            >
+              {parsedStepChildren}
+            </Step>,
+          );
+        }
+        k++;
+      }
+
+      elements.push(<Steps key={`steps-${i}`}>{stepBlocks}</Steps>);
       continue;
     }
 
@@ -287,7 +344,9 @@ function renderMdxClientSide(mdxText: string) {
 export default function CreateModulePage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const user = session?.user as { name?: string; image?: string; role?: string } | undefined;
+  const user = session?.user as
+    | { name?: string; image?: string; role?: string }
+    | undefined;
 
   // Editor State
   const [title, setTitle] = React.useState("My New Coding Module");
@@ -299,46 +358,134 @@ export default function CreateModulePage() {
   const [track, setTrack] = React.useState("dsa");
   const [type, setType] = React.useState<"module" | "blog">("module");
   const [subCategorySlug, setSubCategorySlug] = React.useState("");
-  const [subCategories, setSubCategories] = React.useState<{ id: string; name: string; slug: string }[]>([]);
+  const [subCategories, setSubCategories] = React.useState<
+    { id: string; name: string; slug: string }[]
+  >([]);
   const [newSubCategory, setNewSubCategory] = React.useState("");
   const [isCreatingSubCat, setIsCreatingSubCat] = React.useState(false);
   const [content, setContent] = React.useState(
-    `# Learning the core fundamentals
+    `# SyntaxSpace Technical Module Template
 
-We are exploring critical software components. Below is a warning banner:
+Welcome to the **SyntaxSpace Editor**! This template showcases all custom interactive MDX components and design elements available for building engaging technical curricula. Feel free to delete or edit any section.
 
-<Callout type="warning" title="Important Notice">
-  Always remember to design systems in layers!
+---
+
+## 1. Rich Alert Callouts
+Use Callout boxes to highlight important lessons, warnings, tips, or errors.
+
+<Callout type="info" title="Information Box">
+  This is a standard information box. Use it to provide background context or extra explanations.
 </Callout>
 
-## Interactive Array Sorting
+<Callout type="tip" title="Pro Coding Tip">
+  Use the **unstable_cache** API to leverage Next.js's data caching mechanism across server components!
+</Callout>
 
-Step through Bubble Sort below to understand comparison patterns in actions:
+<Callout type="warning" title="Watch Out!">
+  Ensure all foreign keys have appropriate indexes in your PostgreSQL database to prevent full table scans.
+</Callout>
+
+<Callout type="danger" title="Critical Action Required">
+  Never expose database secrets or private credentials in client-side bundles or public directories!
+</Callout>
+
+---
+
+## 2. Multi-Language Code Tabs
+Present code implementations side-by-side using the \`<CodeTabs>\` container. The tab headers are automatically resolved from your language type or the top comment!
+
+<CodeTabs>
+\`\`\`ts
+// TypeScript Implementation
+const double = (n: number): number => n * 2;
+console.log(double(21));
+\`\`\`
+
+\`\`\`python
+# Python Implementation
+def double(n: int) -> int:
+    return n * 2
+
+print(double(21))
+\`\`\`
+
+\`\`\`cpp
+// C++ Implementation
+#include <iostream>
+
+int doubleVal(int n) {
+    return n * 2;
+}
+
+int main() {
+    std::cout << doubleVal(21) << std::endl;
+    return 0;
+}
+\`\`\`
+</CodeTabs>
+
+---
+
+## 3. Structured Step-by-Step Timelines
+Guide readers through linear execution steps using \`<Steps>\` and \`<Step>\` components.
+
+<Steps>
+<Step number="1" title="Initialize Database Connection" subtitle="Step 1 of Setup">
+  Configure your Prisma connection using environment variables in your local \`.env\` configuration file.
+</Step>
+
+<Step number="2" title="Define the DB Schema" subtitle="Step 2 of Setup">
+  Add your model declarations, primary keys, relationships, and indices in the \`prisma.schema\` file.
+</Step>
+
+<Step number="3" title="Generate Client & Run Migrations" subtitle="Step 3 of Setup">
+  Execute the Prisma CLI generator and run your initial migrations to bring the database live!
+</Step>
+</Steps>
+
+---
+
+## 4. Interactive DSA Sandbox
+Insert an interactive visualizer block where users can play, pause, reset, and step through different sorting algorithms with time and space complexity analysis metrics!
 
 <DSAVisualizer />
 
-## Relational SQL Sandbox
+---
 
-Select entries from our users and orders tables below in the dynamic database shell:
+## 5. SQL Execution Shell
+Embed a fully-interactive SQL terminal where users can run, query, and join relational tables (\`users\` and \`orders\`) directly inside their browser workspace!
 
 <SQLPlayground />
 
+---
+
+## 6. Rich Media & Visuals
+Enrich your modules with custom technical graphics, diagrams, or illustrations using standard Markdown image syntax:
+
+![Developer Workspace](https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80)
 `,
   );
 
   const [isSaving, setIsSaving] = React.useState(false);
   const [placeAboveSlug, setPlaceAboveSlug] = React.useState("__BOTTOM__");
-  const [existingTopics, setExistingTopics] = React.useState<{ id: string; title: string; slug: string }[]>([]);
-  const [placeCategoryAboveSlug, setPlaceCategoryAboveSlug] = React.useState("__BOTTOM__");
-  const [existingCategories, setExistingCategories] = React.useState<{ id: string; name: string; slug: string }[]>([]);
+  const [existingTopics, setExistingTopics] = React.useState<
+    { id: string; title: string; slug: string }[]
+  >([]);
+  const [placeCategoryAboveSlug, setPlaceCategoryAboveSlug] =
+    React.useState("__BOTTOM__");
+  const [existingCategories, setExistingCategories] = React.useState<
+    { id: string; name: string; slug: string }[]
+  >([]);
 
   // Fetch existing categories for reordering
   React.useEffect(() => {
     fetch("/api/admin/categories")
-      .then((r) => r.ok ? r.json() : { categories: [] })
+      .then((r) => (r.ok ? r.json() : { categories: [] }))
       .then((data) => {
         // Exclude the current selected track from options to avoid placing it above itself!
-        const otherCategories = (data.categories || []).filter((c: { slug: string }) => c.slug !== track);
+        const otherCategories = (data.categories || []).filter(
+          (c: { slug: string }) => c.slug !== track,
+        );
         setExistingCategories(otherCategories);
       })
       .catch(() => setExistingCategories([]));
@@ -347,11 +494,15 @@ Select entries from our users and orders tables below in the dynamic database sh
   // Fetch existing topics in subcategory for reordering
   React.useEffect(() => {
     if (track && subCategorySlug) {
-      fetch(`/api/admin/topics?categorySlug=${encodeURIComponent(track)}&subCategorySlug=${encodeURIComponent(subCategorySlug)}`)
-        .then((r) => r.ok ? r.json() : { topics: [] })
+      fetch(
+        `/api/admin/topics?categorySlug=${encodeURIComponent(track)}&subCategorySlug=${encodeURIComponent(subCategorySlug)}`,
+      )
+        .then((r) => (r.ok ? r.json() : { topics: [] }))
         .then((data) => {
           // Exclude current topic being edited or created
-          const otherTopics = (data.topics || []).filter((t: { slug: string }) => t.slug !== originalSlug && t.slug !== slug);
+          const otherTopics = (data.topics || []).filter(
+            (t: { slug: string }) => t.slug !== originalSlug && t.slug !== slug,
+          );
           setExistingTopics(otherTopics);
         })
         .catch(() => setExistingTopics([]));
@@ -365,7 +516,7 @@ Select entries from our users and orders tables below in the dynamic database sh
     setSubCategorySlug("");
     setSubCategories([]);
     fetch(`/api/admin/subcategories?categorySlug=${encodeURIComponent(track)}`)
-      .then((r) => r.ok ? r.json() : { subCategories: [] })
+      .then((r) => (r.ok ? r.json() : { subCategories: [] }))
       .then((data) => {
         setSubCategories(data.subCategories || []);
         if (data.subCategories?.length > 0) {
@@ -383,7 +534,10 @@ Select entries from our users and orders tables below in the dynamic database sh
       const res = await fetch("/api/admin/subcategories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newSubCategory.trim(), categorySlug: track }),
+        body: JSON.stringify({
+          name: newSubCategory.trim(),
+          categorySlug: track,
+        }),
       });
       if (res.ok) {
         const created = await res.json();
@@ -398,7 +552,9 @@ Select entries from our users and orders tables below in the dynamic database sh
   const [showImageModal, setShowImageModal] = React.useState(false);
   const [imageUrl, setImageUrl] = React.useState("");
   const [altText, setAltText] = React.useState("Visual diagram");
-  const [uploadProgress, setUploadProgress] = React.useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = React.useState<number | null>(
+    null,
+  );
 
   // Load content if track and slug are provided in the URL query params for editing
   React.useEffect(() => {
@@ -408,7 +564,9 @@ Select entries from our users and orders tables below in the dynamic database sh
       const slugParam = params.get("slug");
       if (trackParam && slugParam) {
         setOriginalSlug(slugParam);
-        fetch(`/api/admin/get?track=${encodeURIComponent(trackParam)}&slug=${encodeURIComponent(slugParam)}`)
+        fetch(
+          `/api/admin/get?track=${encodeURIComponent(trackParam)}&slug=${encodeURIComponent(slugParam)}`,
+        )
           .then((res) => {
             if (res.ok) return res.json();
             throw new Error("Failed to fetch content");
@@ -599,16 +757,24 @@ Select entries from our users and orders tables below in the dynamic database sh
         <div className="flex items-center gap-2">
           <Select
             value={type}
-            onValueChange={(val) => setType((val ?? "module") as "module" | "blog")}
+            onValueChange={(val) =>
+              setType((val ?? "module") as "module" | "blog")
+            }
           >
             <SelectTrigger className="h-10 w-36 rounded-lg border border-border bg-background px-4 text-xs font-semibold hover:bg-muted/50 cursor-pointer">
               <SelectValue placeholder="Select type" />
             </SelectTrigger>
             <SelectContent className="rounded-lg border border-border bg-popover text-popover-foreground shadow-lg min-w-[144px]">
-              <SelectItem value="module" className="text-xs font-semibold cursor-pointer py-2 px-3">
+              <SelectItem
+                value="module"
+                className="text-xs font-semibold cursor-pointer py-2 px-3"
+              >
                 Module
               </SelectItem>
-              <SelectItem value="blog" className="text-xs font-semibold cursor-pointer py-2 px-3">
+              <SelectItem
+                value="blog"
+                className="text-xs font-semibold cursor-pointer py-2 px-3"
+              >
                 Blog Post
               </SelectItem>
             </SelectContent>
@@ -655,7 +821,7 @@ Select entries from our users and orders tables below in the dynamic database sh
       </header>
 
       {/* Module Configuration Metadata Panel */}
-      <div className="border-b border-border bg-muted/5 px-6 py-4 flex flex-col md:flex-row gap-4 shrink-0 select-none">
+      <div className="border-b border-border bg-muted/5 px-6 py-4 grid grid-cols-3 lg:grid-cols-4 gap-2 shrink-0 select-none">
         <div className="flex-1 space-y-1.5">
           <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
             Module Title
@@ -685,19 +851,41 @@ Select entries from our users and orders tables below in the dynamic database sh
           <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
             Category
           </label>
-          <Select
-            value={track}
-            onValueChange={(val) => setTrack(val ?? "dsa")}
-          >
+          <Select value={track} onValueChange={(val) => setTrack(val ?? "dsa")}>
             <SelectTrigger className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm font-semibold hover:bg-muted/50 cursor-pointer">
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent className="rounded-lg border border-border bg-popover text-popover-foreground shadow-lg min-w-[180px]">
-              <SelectItem value="dsa" className="text-sm font-semibold cursor-pointer py-2 px-3">DSA</SelectItem>
-              <SelectItem value="system-design" className="text-sm font-semibold cursor-pointer py-2 px-3">System Design</SelectItem>
-              <SelectItem value="oops" className="text-sm font-semibold cursor-pointer py-2 px-3">OOPs</SelectItem>
-              <SelectItem value="sql" className="text-sm font-semibold cursor-pointer py-2 px-3">SQL</SelectItem>
-              <SelectItem value="blogs" className="text-sm font-semibold cursor-pointer py-2 px-3">Blogs</SelectItem>
+              <SelectItem
+                value="dsa"
+                className="text-sm font-semibold cursor-pointer py-2 px-3"
+              >
+                DSA
+              </SelectItem>
+              <SelectItem
+                value="system-design"
+                className="text-sm font-semibold cursor-pointer py-2 px-3"
+              >
+                System Design
+              </SelectItem>
+              <SelectItem
+                value="oops"
+                className="text-sm font-semibold cursor-pointer py-2 px-3"
+              >
+                OOPs
+              </SelectItem>
+              <SelectItem
+                value="sql"
+                className="text-sm font-semibold cursor-pointer py-2 px-3"
+              >
+                SQL
+              </SelectItem>
+              <SelectItem
+                value="blogs"
+                className="text-sm font-semibold cursor-pointer py-2 px-3"
+              >
+                Blogs
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -707,19 +895,34 @@ Select entries from our users and orders tables below in the dynamic database sh
           <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
             Place Category Above (Reorder)
           </label>
-          <Select value={placeCategoryAboveSlug} onValueChange={(val) => setPlaceCategoryAboveSlug(val ?? "__BOTTOM__")}>
+          <Select
+            value={placeCategoryAboveSlug}
+            onValueChange={(val) =>
+              setPlaceCategoryAboveSlug(val ?? "__BOTTOM__")
+            }
+          >
             <SelectTrigger className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm font-semibold hover:bg-muted/50 cursor-pointer">
               <SelectValue placeholder="Select position" />
             </SelectTrigger>
             <SelectContent className="rounded-lg border border-border bg-popover text-popover-foreground shadow-lg min-w-[200px]">
-              <SelectItem value="__BOTTOM__" className="text-sm font-semibold cursor-pointer py-2 px-3">
+              <SelectItem
+                value="__BOTTOM__"
+                className="text-sm font-semibold cursor-pointer py-2 px-3"
+              >
                 [Bottom of List - Default]
               </SelectItem>
-              <SelectItem value="__TOP__" className="text-sm font-semibold cursor-pointer py-2 px-3">
+              <SelectItem
+                value="__TOP__"
+                className="text-sm font-semibold cursor-pointer py-2 px-3"
+              >
                 [First / Top of List]
               </SelectItem>
               {existingCategories.map((c) => (
-                <SelectItem key={c.id} value={c.slug} className="text-sm font-semibold cursor-pointer py-2 px-3">
+                <SelectItem
+                  key={c.id}
+                  value={c.slug}
+                  className="text-sm font-semibold cursor-pointer py-2 px-3"
+                >
                   Above: {c.name}
                 </SelectItem>
               ))}
@@ -733,13 +936,20 @@ Select entries from our users and orders tables below in the dynamic database sh
             Sub-Category
           </label>
           {subCategories.length > 0 ? (
-            <Select value={subCategorySlug} onValueChange={(val) => setSubCategorySlug(val ?? "")}>
+            <Select
+              value={subCategorySlug}
+              onValueChange={(val) => setSubCategorySlug(val ?? "")}
+            >
               <SelectTrigger className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm font-semibold hover:bg-muted/50 cursor-pointer">
                 <SelectValue placeholder="Select sub-category" />
               </SelectTrigger>
               <SelectContent className="rounded-lg border border-border bg-popover text-popover-foreground shadow-lg min-w-[200px]">
                 {subCategories.map((sub) => (
-                  <SelectItem key={sub.id} value={sub.slug} className="text-sm font-semibold cursor-pointer py-2 px-3">
+                  <SelectItem
+                    key={sub.id}
+                    value={sub.slug}
+                    className="text-sm font-semibold cursor-pointer py-2 px-3"
+                  >
                     {sub.name}
                   </SelectItem>
                 ))}
@@ -782,19 +992,32 @@ Select entries from our users and orders tables below in the dynamic database sh
           <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
             Place Above Topic (Reorder)
           </label>
-          <Select value={placeAboveSlug} onValueChange={(val) => setPlaceAboveSlug(val ?? "__BOTTOM__")}>
+          <Select
+            value={placeAboveSlug}
+            onValueChange={(val) => setPlaceAboveSlug(val ?? "__BOTTOM__")}
+          >
             <SelectTrigger className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm font-semibold hover:bg-muted/50 cursor-pointer">
               <SelectValue placeholder="Select position" />
             </SelectTrigger>
             <SelectContent className="rounded-lg border border-border bg-popover text-popover-foreground shadow-lg min-w-[240px]">
-              <SelectItem value="__BOTTOM__" className="text-sm font-semibold cursor-pointer py-2 px-3">
+              <SelectItem
+                value="__BOTTOM__"
+                className="text-sm font-semibold cursor-pointer py-2 px-3"
+              >
                 [Bottom of List - Default]
               </SelectItem>
-              <SelectItem value="__TOP__" className="text-sm font-semibold cursor-pointer py-2 px-3">
+              <SelectItem
+                value="__TOP__"
+                className="text-sm font-semibold cursor-pointer py-2 px-3"
+              >
                 [First / Top of List]
               </SelectItem>
               {existingTopics.map((topic) => (
-                <SelectItem key={topic.id} value={topic.slug} className="text-sm font-semibold cursor-pointer py-2 px-3">
+                <SelectItem
+                  key={topic.id}
+                  value={topic.slug}
+                  className="text-sm font-semibold cursor-pointer py-2 px-3"
+                >
                   Above: {topic.title}
                 </SelectItem>
               ))}

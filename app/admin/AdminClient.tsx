@@ -291,7 +291,7 @@ export function AdminClient({ initialModules }: AdminClientProps) {
       </header>
 
       {/* Main Console Frame */}
-      <main className="flex-1 max-w-[80vw] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8">
+      <main className="flex-1 lg:max-w-[80vw] w-[90vw] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8">
         {/* Left Side: File Upload Zone & Actions */}
         <div className="w-full lg:w-80 shrink-0 space-y-6 select-none">
           {/* Quick Create buttons */}
@@ -308,7 +308,11 @@ export function AdminClient({ initialModules }: AdminClientProps) {
                 href="/dashboard/create"
                 className="w-full h-9 rounded-md bg-foreground text-xs font-semibold text-background hover:bg-foreground/90 flex items-center justify-center gap-1.5 transition-colors"
               >
-                <HugeiconsIcon icon={PlusSignIcon} className="h-3.5 w-3.5" />
+                <HugeiconsIcon
+                  icon={PlusSignIcon}
+                  size={16}
+                  className="mb-0.5 font-semibold"
+                />
                 <span>Create New Module</span>
               </Link>
             </div>
@@ -359,7 +363,7 @@ export function AdminClient({ initialModules }: AdminClientProps) {
             </div>
 
             {/* Track Tabs Filter */}
-            <div className="flex bg-muted/20 border border-border p-0.5 rounded-md text-sm font-semibold text-muted-foreground overflow-x-auto w-full sm:w-auto shrink-0 select-none">
+            <div className="flex bg-muted/20 border border-border p-0.5 rounded-md text-xs font-semibold text-muted-foreground overflow-x-auto w-full sm:w-auto shrink-0 select-none">
               {["all", "dsa", "system-design", "oops", "sql", "blogs"].map(
                 (t) => (
                   <button
@@ -379,7 +383,7 @@ export function AdminClient({ initialModules }: AdminClientProps) {
           </div>
 
           {/* Core Modules Data Table */}
-          <div className="border border-border rounded-xl bg-card overflow-hidden">
+          <div className="border border-border max-h-[75vh] rounded-xl bg-card overflow-hidden overflow-y-auto">
             {filteredModules.length === 0 ? (
               <div className="p-12 text-center select-none">
                 <HugeiconsIcon
@@ -417,7 +421,7 @@ export function AdminClient({ initialModules }: AdminClientProps) {
                       >
                         {/* Title and description */}
                         <td className="px-5 py-3.5">
-                          <span className="text-xs font-bold text-foreground block leading-tight">
+                          <span className="text-sm font-bold text-foreground block leading-tight">
                             {m.title}
                           </span>
                           <span className="text-sm text-muted-foreground line-clamp-1 mt-0.5 font-light">
@@ -427,8 +431,7 @@ export function AdminClient({ initialModules }: AdminClientProps) {
 
                         {/* Track Badge */}
                         <td className="px-5 py-3.5 select-none">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border/80 bg-muted/30 text-xs font-mono font-medium text-foreground capitalize">
-                            {getTrackIcon(m.track)}
+                          <span className="inline-flex  gap-1   text-xs font-mono font-medium text-foreground capitalize">
                             <span>{m.track.replace("-", " ")}</span>
                           </span>
                         </td>
@@ -673,7 +676,7 @@ export function AdminClient({ initialModules }: AdminClientProps) {
             <p className="text-xs text-muted-foreground leading-relaxed">
               Are you absolutely sure you want to delete{" "}
               <span className="font-semibold text-foreground">
-              &quot;{deleteTarget.title}&quot;
+                &quot;{deleteTarget.title}&quot;
               </span>
               ? This will permanently delete the content file from your
               workspace disk and clear its records from the database.
