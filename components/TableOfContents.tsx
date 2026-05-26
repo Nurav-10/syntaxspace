@@ -122,18 +122,18 @@ export function TableOfContents() {
   };
 
   return (
-    <aside className="hidden xl:block w-64 border-l border-border h-[calc(100vh-56px)] sticky top-14 self-start bg-background p-6 shrink-0 select-none transition-colors duration-200">
+    <aside className="hidden xl:block w-64 border-l border-border h-[calc(100vh-56px)] sticky top-14 self-start bg-background p-6 shrink-0 select-none transition-colors duration-200 overflow-y-auto">
       <div className="flex items-center gap-2 mb-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         <List className="h-3.5 w-3.5" />
         <span>On This Page</span>
       </div>
 
       <nav className="relative border-l border-border pl-px py-1 space-y-3.5">
-        {headings.map((heading) => {
+        {headings.map((heading, index) => {
           const isActive = activeId === heading.id;
           return (
             <a
-              key={heading.id}
+              key={`${heading.id}-${index}`}
               href={`#${heading.id}`}
               onClick={(e) => scrollToHeading(e, heading.id)}
               className={cn(

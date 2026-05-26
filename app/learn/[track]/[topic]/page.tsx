@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import rehypeShiki from "@shikijs/rehype";
 import { CodeTabs } from "@/components/mdx/CodeTabs";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import type { Metadata } from "next";
 import { Steps, Step } from "@/components/mdx/Step";
 
@@ -141,9 +143,9 @@ const MDX_COMPONENTS = {
     return (
       <code
         className={cn(
-          "font-mono text-xs",
+          "font-mono text-sm",
           isInline
-            ? "bg-muted border border-border/80 px-1.5 py-0.5 rounded text-foreground font-medium"
+            ? "bg-foreground/5 border border-border/80 px-1.5 py-0.5 rounded text-foreground"
             : "bg-transparent border-0 p-0 rounded-none text-inherit",
           className,
         )}
@@ -204,7 +206,7 @@ export default async function LearnPage({ params }: LearnPageProps) {
     components: MDX_COMPONENTS,
     options: {
       mdxOptions: {
-        remarkPlugins: [remarkGfm],
+        remarkPlugins: [remarkGfm, remarkMath],
         rehypePlugins: [
           [
             rehypeShiki,
@@ -215,6 +217,7 @@ export default async function LearnPage({ params }: LearnPageProps) {
               },
             },
           ],
+          rehypeKatex,
         ],
       },
     },

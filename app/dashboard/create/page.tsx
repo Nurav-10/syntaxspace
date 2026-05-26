@@ -28,7 +28,7 @@ import {
   HeadingIcon,
   GridIcon,
 } from "@hugeicons/core-free-icons";
-import { List, Info } from "lucide-react";
+import { List, Info, Sparkles } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -178,7 +178,9 @@ function renderMdxClientSide(mdxText: string) {
           const titleMatch = sLine.match(/title="([^"]+?)"/);
           const subtitleMatch = sLine.match(/subtitle="([^"]+?)"/);
 
-          const stepNumber = numberMatch ? numberMatch[1] : String(stepBlocks.length + 1);
+          const stepNumber = numberMatch
+            ? numberMatch[1]
+            : String(stepBlocks.length + 1);
           const stepTitle = titleMatch ? titleMatch[1] : "Step";
           const stepSubtitle = subtitleMatch ? subtitleMatch[1] : undefined;
 
@@ -555,6 +557,115 @@ Enrich your modules with custom technical graphics, diagrams, or illustrations u
   const [uploadProgress, setUploadProgress] = React.useState<number | null>(
     null,
   );
+
+  // AI Assistant Panel State
+  const [showAiAssistant, setShowAiAssistant] = React.useState(false);
+  const [aiTopic, setAiTopic] = React.useState("");
+  const [aiPromptDetail, setAiPromptDetail] = React.useState("");
+  const [aiActiveComponents, setAiActiveComponents] = React.useState<string[]>(
+    [],
+  );
+  const [aiInsertMode, setAiInsertMode] = React.useState<
+    "replace" | "append" | "cursor"
+  >("replace");
+  const [isGenerating, setIsGenerating] = React.useState(false);
+
+  const handleGenerateAIModule = async () => {
+    if (!aiTopic.trim()) {
+      toast.error("Topic is required", {
+        description: "Please enter what you'd like the AI to write about.",
+      });
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/admin/generate-module", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: aiTopic,
+          track: track,
+          promptDetail: aiPromptDetail,
+          activeComponents: aiActiveComponents,
+        }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = "An unexpected error occurred.";
+        try {
+          const err = await response.json();
+          errorMessage = err.message || errorMessage;
+        } catch {}
+        throw new Error(errorMessage);
+      }
+
+      if (!response.body) {
+        throw new Error("No response stream body received.");
+      }
+
+      // Capture original state and cursor positions before we start modifying content
+      const textarea = textareaRef.current;
+      let start = 0;
+      let end = 0;
+      let originalText = content;
+      if (textarea) {
+        start = textarea.selectionStart;
+        end = textarea.selectionEnd;
+        originalText = textarea.value;
+      }
+      const textBefore = originalText.substring(0, start);
+      const textAfter = originalText.substring(end);
+
+      // Hide the AI assistant drawer panel immediately so user can see stream writing
+      setShowAiAssistant(false);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let accumulated = "";
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        if (value) {
+          const chunk = decoder.decode(value, { stream: !done });
+          accumulated += chunk;
+
+          // Strip code fence blocks (```mdx, ```markdown, ```etc) on the fly
+          let cleanedAccumulated = accumulated;
+          if (cleanedAccumulated.startsWith("`")) {
+            const match = cleanedAccumulated.match(/^```(?:mdx|markdown|html|txt)?\n?/);
+            if (match) {
+              cleanedAccumulated = cleanedAccumulated.substring(match[0].length);
+            }
+          }
+
+          if (done) {
+            cleanedAccumulated = cleanedAccumulated.trim();
+            if (cleanedAccumulated.endsWith("```")) {
+              cleanedAccumulated = cleanedAccumulated.slice(0, -3).trim();
+            }
+          }
+
+          if (aiInsertMode === "replace") {
+            setContent(cleanedAccumulated);
+          } else if (aiInsertMode === "append") {
+            setContent(originalText + (originalText ? "\n\n" : "") + cleanedAccumulated);
+          } else if (aiInsertMode === "cursor") {
+            setContent(textBefore + cleanedAccumulated + textAfter);
+          }
+        }
+      }
+      toast.success("AI Generation completed successfully!");
+    } catch (error: unknown) {
+      console.error("AI generation failed:", error);
+      toast.error("AI Stream Failure", {
+        description: error instanceof Error ? error.message : "Failed to stream content from Syntaxspace AI.",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   // Load content if track and slug are provided in the URL query params for editing
   React.useEffect(() => {
@@ -1025,7 +1136,7 @@ Enrich your modules with custom technical graphics, diagrams, or illustrations u
           </Select>
         </div>
 
-        <div className="flex-[2] space-y-1.5">
+        <div className="flex-2 space-y-1.5">
           <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
             Brief Description
           </label>
@@ -1040,9 +1151,158 @@ Enrich your modules with custom technical graphics, diagrams, or illustrations u
       </div>
 
       {/* Editor & Live Preview Workspace */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div className="flex-1 flex overflow-hidden min-h-0 relative">
+        {/* Leftmost: AI Assistant Drawer Panel */}
+        <div
+          className={`h-full flex flex-col border-r border-border bg-card shrink-0 select-none overflow-hidden transition-all duration-300 ease-in-out ${
+            showAiAssistant
+              ? "w-80 md:w-96 opacity-100"
+              : "w-0 opacity-0 pointer-events-none"
+          }`}
+        >
+          <div className="p-5 border-b border-border flex justify-between items-center bg-muted/5 shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded bg-foreground/5 flex items-center justify-center text-foreground border border-border">
+                <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold font-mono tracking-tight text-foreground">
+                  SYNTAX AI
+                </h3>
+                <p className="text-[10px] text-muted-foreground">
+                  Draft curriculum modules dynamically
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAiAssistant(false)}
+              className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            {/* Topic Input */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-sans">
+                Module Topic (Required)
+              </label>
+              <textarea
+                value={aiTopic}
+                onChange={(e) => setAiTopic(e.target.value)}
+                placeholder="E.g. Binary Search Trees operations, or Dijkstra's Shortest Path Algorithm..."
+                className="w-full h-20 rounded-lg border border-border bg-background p-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none leading-relaxed"
+              />
+            </div>
+
+            {/* Prompt Detail Guidelines */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-sans">
+                Additional Guidelines (Optional)
+              </label>
+              <textarea
+                value={aiPromptDetail}
+                onChange={(e) => setAiPromptDetail(e.target.value)}
+                placeholder="E.g., Focus on time complexity, include multiple code exercises, or keep explanations extremely visual..."
+                className="w-full h-16 rounded-lg border border-border bg-background p-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none leading-relaxed"
+              />
+            </div>
+
+            {/* Interactive Components Selection */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-sans">
+                Interactive Elements (Prompt AI to use)
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: "Callout", label: "Callout Alerts" },
+                  { key: "CodeTabs", label: "Multi-Lang Tabs" },
+                  { key: "Steps", label: "Step Timelines" },
+                  { key: "DSAVisualizer", label: "DSA Sorter Widget" },
+                  { key: "SQLPlayground", label: "SQL Terminal Widget" },
+                ].map((comp) => {
+                  const isChecked = aiActiveComponents.includes(comp.key);
+                  return (
+                    <label
+                      key={comp.key}
+                      className={`flex items-center gap-1.5 p-2 rounded-lg border text-[10px] font-semibold cursor-pointer transition-all ${
+                        isChecked
+                          ? "bg-foreground/5 border-foreground text-foreground shadow-sm font-bold border-2"
+                          : "border-border bg-background/50 hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          setAiActiveComponents((prev) =>
+                            isChecked
+                              ? prev.filter((k) => k !== comp.key)
+                              : [...prev, comp.key],
+                          );
+                        }}
+                        className="sr-only"
+                      />
+                      <span>{comp.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Insert Mode Selection */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block font-sans">
+                Insertion Strategy
+              </label>
+              <div className="grid grid-cols-3 gap-1 bg-muted/40 p-1 rounded-lg border border-border">
+                {[
+                  { key: "replace", label: "Replace All" },
+                  { key: "cursor", label: "At Cursor" },
+                  { key: "append", label: "Append End" },
+                ].map((mode) => {
+                  const isActive = aiInsertMode === mode.key;
+                  return (
+                    <button
+                      key={mode.key}
+                      type="button"
+                      onClick={() =>
+                        setAiInsertMode(
+                          mode.key as "replace" | "append" | "cursor",
+                        )
+                      }
+                      className={`py-1.5 text-[10px] font-bold rounded cursor-pointer transition-all ${
+                        isActive
+                          ? "bg-background text-foreground shadow-sm border border-border/50 font-bold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Action Trigger Button */}
+          <div className="p-5 border-t border-border bg-muted/5 shrink-0">
+            <button
+              onClick={handleGenerateAIModule}
+              disabled={isGenerating || !aiTopic.trim()}
+              className="w-full h-10 rounded-lg bg-foreground hover:bg-foreground/90 disabled:opacity-50 text-background text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer relative overflow-hidden"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Generate Module</span>
+            </button>
+          </div>
+        </div>
+
+
+
         {/* Left Side: Markdown Editor */}
-        <div className="w-1/2 flex flex-col border-r border-border h-full">
+        <div className="flex-1 flex flex-col border-r border-border h-full min-w-0">
           {/* Editor Toolbar */}
           <div className="bg-muted/10 border-b border-border px-3 py-1.5 flex items-center gap-1 shrink-0 select-none overflow-x-auto">
             <button
@@ -1114,7 +1374,7 @@ Enrich your modules with custom technical graphics, diagrams, or illustrations u
             <div className="h-4 w-px bg-border mx-1" />
             <button
               onClick={() => setShowImageModal(true)}
-              className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all flex items-center gap-1 text-[10px] font-medium"
+              className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all flex items-center gap-1 text-[10px] font-medium cursor-pointer"
               title="Insert Image"
             >
               <HugeiconsIcon
@@ -1122,6 +1382,19 @@ Enrich your modules with custom technical graphics, diagrams, or illustrations u
                 className="h-3.5 w-3.5 text-foreground"
               />
               <span>Image</span>
+            </button>
+            <div className="h-4 w-px bg-border mx-1" />
+            <button
+              onClick={() => setShowAiAssistant((prev) => !prev)}
+              className={`p-1.5 rounded transition-all flex items-center gap-1 text-[10px] font-semibold cursor-pointer border ${
+                showAiAssistant
+                  ? "bg-foreground/10 border-foreground/30 text-foreground"
+                  : "border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+              title="AI Writing Assistant"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-foreground" />
+              <span>AI Assist</span>
             </button>
           </div>
 
@@ -1131,6 +1404,47 @@ Enrich your modules with custom technical graphics, diagrams, or illustrations u
               ref={textareaRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              onKeyDown={(e) => {
+                // Intercept Ctrl + L or Cmd + L
+                if (
+                  (e.ctrlKey || e.metaKey) &&
+                  (e.key === "l" || e.key === "L")
+                ) {
+                  e.preventDefault();
+                  const textarea = textareaRef.current;
+                  if (textarea) {
+                    const text = textarea.value;
+                    const selStart = textarea.selectionStart;
+                    const selEnd = textarea.selectionEnd;
+
+                    // Locate the full line bounds containing the current selection
+                    const prevNewline = text.lastIndexOf("\n", selStart - 1);
+                    const lineStart = prevNewline === -1 ? 0 : prevNewline + 1;
+
+                    let nextNewline = text.indexOf("\n", selEnd);
+                    if (nextNewline === -1) nextNewline = text.length;
+                    const lineEnd = nextNewline;
+
+                    const lineContent = text
+                      .substring(lineStart, lineEnd)
+                      .trim();
+
+                    if (lineContent) {
+                      setAiPromptDetail(lineContent);
+                      setShowAiAssistant(true);
+                      toast.success("Line copied to AI Assistant!", {
+                        description:
+                          "The full active line is loaded as prompt context.",
+                      });
+                    } else {
+                      toast.warning("Empty line context", {
+                        description:
+                          "Place your cursor on a line with text and press Ctrl+L.",
+                      });
+                    }
+                  }
+                }
+              }}
               spellCheck={false}
               className="w-full h-full p-6 bg-transparent font-mono text-xs md:text-sm text-foreground resize-none focus:outline-none select-text leading-relaxed"
               style={{ tabSize: 2 }}
@@ -1139,7 +1453,7 @@ Enrich your modules with custom technical graphics, diagrams, or illustrations u
         </div>
 
         {/* Right Side: Live MDX Preview */}
-        <div className="w-1/2 flex flex-col h-full bg-background overflow-y-auto p-8 select-text">
+        <div className="flex-1 flex flex-col h-full bg-background overflow-y-auto p-8 select-text min-w-0">
           <div className="pb-4 border-b border-border mb-6">
             <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
               <span>{track}</span>
